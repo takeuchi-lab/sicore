@@ -23,6 +23,8 @@ $ pip uninstall sicore
 - SelectiveInferenceNorm：正規分布に従う検定統計量に対するselectiveな検定
     - Selection Eventの次数は制限なし
     - Parametric SI対応
+- SelectiveInferenceChiSquared : カイ二乗分布に従う検定統計量に愛するselectiveな検定
+
 - SelectiveInferenceNormSE：正規分布に従う検定統計量に対するselectiveな検定
     - 古い実装（互換性保持のため残している）
     - 2次までのSelection Eventにしか対応しないが，SelectiveInferenceNormより高速
