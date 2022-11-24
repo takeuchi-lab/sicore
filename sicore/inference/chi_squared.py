@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 import math
 import numpy as np
 from scipy.linalg import fractional_matrix_power
-from sicore.utils import is_int_or_float
-from sicore.intervals import intersection, not_, poly_lt_zero, union_all
-from sicore.cdf_mpmath import chi2_cdf_mpmath, tc2_cdf_mpmath, tn_cdf_mpmath as tn_cdf
-from sicore.inference.base import *
+from ..utils import is_int_or_float
+from ..intervals import intersection, not_, poly_lt_zero, union_all
+from ..cdf_mpmath import chi2_cdf_mpmath, tc2_cdf_mpmath, tn_cdf_mpmath as tn_cdf
+from .base import *
 
 
 class InferenceChiSquared(ABC):
