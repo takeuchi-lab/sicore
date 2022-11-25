@@ -25,6 +25,10 @@ from .inference.norm import (
     SelectiveInferenceNorm,
     SelectiveInferenceNormSE,
 )
+from .inference.chi_squared import (
+    NaiveInferenceChiSquared,
+    SelectiveInferenceChiSquared
+)
 from .inference.pci import (
     NaivePCINorm,
     SelectivePCINorm,

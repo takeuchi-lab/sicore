@@ -27,6 +27,10 @@ $ pip uninstall sicore
     - 古い実装（互換性保持のため残している）
     - 2次までのSelection Eventにしか対応しないが，SelectiveInferenceNormより高速
     - Parametric SI非対応
+- NaiveInferenceChiSquared：カイ二乗検定に従う検定統計量に対するnaiveな検定
+- SelectiveInferenceChiSquared：カイ二乗分布に従う検定統計量に対するselectiveな検定
+    - Selection Eventの次数は制限なし
+    - Parametric SI対応 
 - two_sample_test()：naiveな1標本検定
 - one_sample_test()：naiveな2標本検定
 
