@@ -3,7 +3,7 @@ import math
 import numpy as np
 from scipy.linalg import fractional_matrix_power
 from ..utils import is_int_or_float
-from ..intervals import intersection, not_, poly_lt_zero, union_all
+from ..intervals import intersection, not_, poly_lt_zero, union_all, _interval_to_intervals
 from ..cdf_mpmath import chi2_cdf_mpmath, tc2_cdf_mpmath, tn_cdf_mpmath as tn_cdf
 from .base import *
 
@@ -17,9 +17,10 @@ class InferenceChiSquared(ABC):
         data (array-like): Observation data of length `N`.
         var (float, array-like): Value of known variance, or `N`*`N` covariance matrix.
         basis (array-like): List of basis vector of length `N`.
+        use_tf (boolean, optional): Whether to use tensorflow or not. Defaults to False.
     """
 
-    def __init__(self, data, var, basis):
+    def __init__(self, data, var, basis, use_tf=False):
         self.data = data
         basis = np.array(basis)
         V = np.linalg.qr(basis.T)[0]
@@ -34,9 +35,25 @@ class InferenceChiSquared(ABC):
         else:
             self.cov = np.asarray(var)
         self.inv_sqrt_cov = fractional_matrix_power(self.cov, -0.5)
-        self.P_data = np.dot(P, data)
-        self.stat = np.linalg.norm(
-            np.dot(self.inv_sqrt_cov, self.P_data), ord=2)
+
+        if use_tf:
+            try:
+                import tensorflow as tf
+            except ModuleNotFoundError:
+                raise Exception('use_tf is True, but package not found.')
+
+            assert isinstance(data, tf.Tensor)
+
+            self.inv_sqrt_cov = tf.constant(
+                self.inv_sqrt_cov, dtype=tf.float64)
+            self.P_data = tf.tensordot(P, data, axes=1)
+            self.stat = tf.norm(
+                tf.tensordot(self.inv_sqrt_cov, self.P_data, axes=1), ord=2)
+
+        else:
+            self.P_data = np.dot(P, data)
+            self.stat = np.linalg.norm(
+                np.dot(self.inv_sqrt_cov, self.P_data), ord=2)
 
     @abstractmethod
     def test(self, *args, **kwargs):
@@ -52,6 +69,7 @@ class NaiveInferenceChiSquared(InferenceChiSquared):
         data (array-like): Observation data of length `N`.
         var (float, array-like): Value of known variance, or `N`*`N`covariance matrix.
         basis (array-like): List of basis vector of length `N`.
+        use_tf (boolean, optional): Whether to use tensorflow or not. Defaults to False.
     """
 
     def test(self, tail="right"):
@@ -67,7 +85,7 @@ class NaiveInferenceChiSquared(InferenceChiSquared):
             float: p-value
         """
 
-        chi = chi2_cdf_mpmath(self.stat ** 2, self.degree)
+        chi = chi2_cdf_mpmath(np.asarray(self.stat) ** 2, self.degree)
         return calc_pvalue(chi, tail=tail)
 
 
@@ -80,10 +98,11 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
         data (array-like): Observation data of length `N`.
         var (float, array-like): Value of known variance, or `N`*`N` covariance matrix.
         basis (array-like): List of basis vector of length `N`.
+        use_tf (boolean, optional): Whether to use tensorflow or not. Defaults to False.
     """
 
-    def __init__(self, data, var, basis):
-        super().__init__(data, var, basis)
+    def __init__(self, data, var, basis, use_tf=False):
+        super().__init__(data, var, basis, use_tf)
         self.c = self.P_data / self.stat
         self.z = self.data - self.P_data
         self.intervals = [[NINF, INF]]
@@ -149,53 +168,84 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
         """
         self.intervals = intersection(self.intervals, interval)
 
-    def _next_search_data(self):
+    def _next_search_data(self, line_search):
         intervals = not_(self.searched_intervals)
         if len(intervals) == 0:
             return None
-        s, e = random.choice(intervals)
-        param = (e + s) / 2
-        return self.c * param + self.z
+        if line_search:
+            param = intervals[0][0] + self.step
+        else:
+            s, e = random.choice(intervals)
+            param = (e + s) / 2
+        return param
 
-    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10):
+    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10, model_selector=None, line_search=True, step=1e-7):
         """
         Perform parametric search.
 
         Args:
-            algorithm (callable): Callable function which takes a new data vector of
-                length `N` as single argument, and returns the selected model (any) and
-                the truncation intervals (array-like). A closure function might be
+            algorithm (callable): Callable function which takes two vectors (`a`, `b`)
+                and a scalar `z` that can satisfy `data = a + b * z`
+                as arguments, and returns the selected model (any) and
+                the truncation intervals (array-like). When line_search option is activated,
+                algorithm needs to return only one interval (i.e. [l1, u1] or [[l1, u1]])
+                as the truncation intervals (array-like). A closure function might be
                 helpful to implement this.
             max_tail (float, optional): Maximum tail value to be searched. Defaults to
                 1000.
             tol (float, optional): Tolerance error parameter. Defaults to 1e-10.
+            model_selector (callable, optional): Callable function which takes
+                a selected model (any) as single argument, and returns True
+                if the model is used for the testing, and False otherwise.
+                If this option is activated, the truncation intervals for testing is
+                calculated within this method. Defaults to None.
+            line_search (boolean, optional): Whether to perform a line search or a random search
+                from unexplored regions. Defaults to True.
+            step (float, optional): Step width for line search. Defaults to 1e-7.
         """
-        if self.intervals == [[NINF, INF]]:
-            raise Exception("Initial intervals are not set")
-
         self.tol = tol
-        self.mappings = dict()
+        self.step = step
         self.searched_intervals = union_all(
-            [[NINF, -max_tail]] + list(self.intervals) + [[max_tail, INF]], tol=self.tol
+            [[NINF, 1e-10], [float(max_tail), INF]], tol=self.tol
         )
+        self.mappings = dict()
+        result_intervals = list()
 
+        self.count = 0
+        self.detect_count = 0
+
+        z = self._next_search_data(line_search)
         while True:
-            data = self._next_search_data()
-            if data is None:
+            if z is None:
                 break
-            model, intervals = algorithm(data)
-            for interval in intervals:
-                interval = tuple(interval)
-                if interval in self.mappings:
-                    raise Exception(
-                        "An interval appeared a second time. Usually, numerical error "
-                        "causes this exception. Consider increasing the tol parameter "
-                        "or decreasing max_tail parameter to avoid it."
-                    )
-                self.mappings[interval] = model
+            self.count += 1
+
+            model, interval = algorithm(self.z, self.c, z)
+            interval = np.asarray(interval)
+            intervals = _interval_to_intervals(interval)
+
+            if model_selector is None:
+                for interval in intervals:
+                    interval = tuple(interval)
+                    if interval in self.mappings:
+                        raise Exception(
+                            "An interval appeared a second time. Usually, numerical error "
+                            "causes this exception. Consider increasing the tol parameter "
+                            "or decreasing max_tail parameter to avoid it."
+                        )
+                    self.mappings[interval] = model
+            else:
+                if model_selector(model):
+                    result_intervals += intervals
+                    self.detect_count += 1
+
             self.searched_intervals = union_all(
-                self.searched_intervals + list(intervals), tol=self.tol
-            )
+                self.searched_intervals + intervals, tol=self.tol)
+
+            z = self._next_search_data(line_search)
+
+        if model_selector is not None:
+            self.intervals = union_all(result_intervals, tol=self.tol)
 
     def test(
         self, intervals=None, model_selector=None, tail="right", dps="auto", out_log='test_log.log', max_dps=5000
@@ -204,13 +254,13 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
         Perform selective statistical testing.
 
         Args:
-            model_selector (callable): Callable function which takes a selected model
+            model_selector (callable, optional): Callable function which takes a selected model
                 (any) as single argument, and returns True if the model is used for the
                 testing, and False otherwise. This option is valid after calling
-                ``self.parametric_search()``.
+                ``self.parametric_search()`` with model_selector None.
             tail (str, optional): 'double' for double-tailed test, 'right' for
                 right-tailed test, and 'left' for left-tailed test. Defaults to
-                righte'.
+                right'.
             dps (int, str, optional): dps value for mpmath. Set 'auto' to select dps
                 automatically. Defaults to 'auto'.
             max_dps (int, optional): Maximum dps value for mpmath. This option is valid
@@ -234,7 +284,7 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
             self.interval = np.asarray(intervals)
             intervals = self.interval
 
-        stat = self.stat ** 2
+        stat = np.asarray(self.stat) ** 2
         chi_intervals = intersection(
             intervals, [[1e-5, INF]])
         chi_squared_intervals = np.power(chi_intervals, 2)
@@ -242,5 +292,3 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
                              self.degree, dps=dps, out_log=out_log)
 
         return calc_pvalue(chi, tail=tail)
-    
-

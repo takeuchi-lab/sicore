@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import math
 import numpy as np
 from ..utils import is_int_or_float
-from ..intervals import intersection, not_, poly_lt_zero, union_all
+from ..intervals import intersection, not_, poly_lt_zero, union_all, _interval_to_intervals
 from ..cdf_mpmath import tn_cdf_mpmath as tn_cdf
 from .base import *
 
@@ -16,19 +16,38 @@ class InferenceNorm(ABC):
         data (array-like): Observation data of length `N`.
         var (float, array-like): Value of known variance, or `N`*`N` covariance matrix.
         eta (array-like): Contrast vector of length `N`.
+        use_tf (boolean, optional): Whether to use tensorflow or not. Defaults to False.
     """
 
-    def __init__(self, data, var, eta):
+    def __init__(self, data, var, eta, use_tf=False):
         self.data = data
         self.eta = eta
         self.length = len(data)
-        if is_int_or_float(var):
-            self.cov = var * np.identity(self.length)
+
+        if use_tf:
+            try:
+                import tensorflow as tf
+            except ModuleNotFoundError:
+                raise Exception('use_tf is True, but package not found.')
+
+            assert isinstance(data, tf.Tensor)
+
+            if is_int_or_float(var):
+                self.cov = var * tf.linalg.diag(tf.ones_like(data))
+            else:
+                self.cov = tf.constant(var)
+            self.stat = tf.tensordot(eta, data, axes=1)
+            self.sigma_eta = tf.tensordot(self.cov, eta, axes=1)
+            self.eta_sigma_eta = tf.tensordot(eta, self.sigma_eta, axes=1)
+
         else:
-            self.cov = np.asarray(var)
-        self.stat = np.dot(eta, data)
-        self.sigma_eta = np.dot(self.cov, eta)
-        self.eta_sigma_eta = np.dot(eta, self.sigma_eta)
+            if is_int_or_float(var):
+                self.cov = var * np.identity(self.length)
+            else:
+                self.cov = np.asarray(var)
+            self.stat = np.dot(eta, data)
+            self.sigma_eta = np.dot(self.cov, eta)
+            self.eta_sigma_eta = np.dot(eta, self.sigma_eta)
 
     @abstractmethod
     def test(self, *args, **kwargs):
@@ -44,6 +63,7 @@ class NaiveInferenceNorm(InferenceNorm):
         data (array-like): Observation data of length `N`.
         var (float, array-like): Value of known variance, or `N`*`N`covariance matrix.
         eta (array-like): Contrast vector of length `N`.
+        use_tf (boolean, optional): Whether to use tensorflow or not. Defaults to False.
     """
 
     def test(self, tail="double", popmean=0):
@@ -74,10 +94,11 @@ class SelectiveInferenceNorm(InferenceNorm):
         data (array-like): Observation data of length `N`.
         var (float, array-like): Value of known variance, or `N`*`N` covariance matrix.
         eta (array-like): Contrast vector of length `N`.
+        use_tf (boolean, optional): Whether to use tensorflow or not. Defaults to False.
     """
 
-    def __init__(self, data, var, eta):
-        super().__init__(data, var, eta)
+    def __init__(self, data, var, eta, use_tf=False):
+        super().__init__(data, var, eta, use_tf)
         self.c = self.sigma_eta / self.eta_sigma_eta
         self.z = data - self.stat * self.c
         self.intervals = [[NINF, INF]]
@@ -143,53 +164,84 @@ class SelectiveInferenceNorm(InferenceNorm):
         """
         self.intervals = intersection(self.intervals, interval)
 
-    def _next_search_data(self):
+    def _next_search_data(self, line_search):
         intervals = not_(self.searched_intervals)
         if len(intervals) == 0:
             return None
-        s, e = random.choice(intervals)
-        param = (e + s) / 2
-        return self.c * param + self.z
+        if line_search:
+            param = intervals[0][0] + self.step
+        else:
+            s, e = random.choice(intervals)
+            param = (e + s) / 2
+        return param
 
-    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10):
+    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10, model_selector=None, line_search=True, step=1e-7):
         """
         Perform parametric search.
 
         Args:
-            algorithm (callable): Callable function which takes a new data vector of
-                length `N` as single argument, and returns the selected model (any) and
-                the truncation intervals (array-like). A closure function might be
+            algorithm (callable): Callable function which takes two vectors (`a`, `b`)
+                and a scalar `z` that can satisfy `data = a + b * z`
+                as arguments, and returns the selected model (any) and
+                the truncation intervals (array-like). When line_search option is activated,
+                algorithm needs to return only one interval (i.e. [l1, u1] or [[l1, u1]])
+                as the truncation intervals (array-like). A closure function might be
                 helpful to implement this.
             max_tail (float, optional): Maximum tail value to be searched. Defaults to
                 1000.
             tol (float, optional): Tolerance error parameter. Defaults to 1e-10.
+            model_selector (callable, optional): Callable function which takes
+                a selected model (any) as single argument, and returns True
+                if the model is used for the testing, and False otherwise.
+                If this option is activated, the truncation intervals for testing is
+                calculated within this method. Defaults to None.
+            line_search (boolean, optional): Whether to perform a line search or a random search
+                from unexplored regions. Defaults to True.
+            step (float, optional): Step width for line search. Defaults to 1e-7.
         """
-        if self.intervals == [[NINF, INF]]:
-            raise Exception("Initial intervals are not set")
-
         self.tol = tol
-        self.mappings = dict()
+        self.step = step
         self.searched_intervals = union_all(
-            [[NINF, -max_tail]] + list(self.intervals) + [[max_tail, INF]], tol=self.tol
+            [[NINF, -float(max_tail)], [float(max_tail), INF]], tol=self.tol
         )
+        self.mappings = dict()
+        result_intervals = list()
 
+        self.count = 0
+        self.detect_count = 0
+
+        z = self._next_search_data(line_search)
         while True:
-            data = self._next_search_data()
-            if data is None:
+            if z is None:
                 break
-            model, intervals = algorithm(data)
-            for interval in intervals:
-                interval = tuple(interval)
-                if interval in self.mappings:
-                    raise Exception(
-                        "An interval appeared a second time. Usually, numerical error "
-                        "causes this exception. Consider increasing the tol parameter "
-                        "or decreasing max_tail parameter to avoid it."
-                    )
-                self.mappings[interval] = model
+            self.count += 1
+
+            model, interval = algorithm(self.z, self.c, z)
+            interval = np.asarray(interval)
+            intervals = _interval_to_intervals(interval)
+
+            if model_selector is None:
+                for interval in intervals:
+                    interval = tuple(interval)
+                    if interval in self.mappings:
+                        raise Exception(
+                            "An interval appeared a second time. Usually, numerical error "
+                            "causes this exception. Consider increasing the tol parameter "
+                            "or decreasing max_tail parameter to avoid it."
+                        )
+                    self.mappings[interval] = model
+            else:
+                if model_selector(model):
+                    result_intervals += intervals
+                    self.detect_count += 1
+
             self.searched_intervals = union_all(
-                self.searched_intervals + list(intervals), tol=self.tol
-            )
+                self.searched_intervals + intervals, tol=self.tol)
+
+            z = self._next_search_data(line_search)
+
+        if model_selector is not None:
+            self.intervals = union_all(result_intervals, tol=self.tol)
 
     def test(
         self, intervals=None, model_selector=None, tail="double", popmean=0, dps="auto", out_log='test_log.log', max_dps=5000
@@ -198,10 +250,10 @@ class SelectiveInferenceNorm(InferenceNorm):
         Perform selective statistical testing.
 
         Args:
-            model_selector (callable): Callable function which takes a selected model
+            model_selector (callable, optional): Callable function which takes a selected model
                 (any) as single argument, and returns True if the model is used for the
                 testing, and False otherwise. This option is valid after calling
-                ``self.parametric_search()``.
+                ``self.parametric_search()`` with model_selector None.
             tail (str, optional): 'double' for double-tailed test, 'right' for
                 right-tailed test, and 'left' for left-tailed test. Defaults to
                 'double'.
@@ -229,10 +281,11 @@ class SelectiveInferenceNorm(InferenceNorm):
         else:
             self.interval = np.asarray(intervals)
             intervals = self.interval
-        
+
         stat = standardize(self.stat, popmean, self.eta_sigma_eta)
         norm_intervals = standardize(intervals, popmean, self.eta_sigma_eta)
-        F = tn_cdf(stat, norm_intervals, dps=dps, max_dps=max_dps, out_log=out_log)
+        F = tn_cdf(stat, norm_intervals, dps=dps,
+                   max_dps=max_dps, out_log=out_log)
 
         return calc_pvalue(F, tail=tail)
 
@@ -341,8 +394,10 @@ class SelectiveInferenceNormSE(SelectiveInferenceNorm):
                     "Test direction of interest does not "
                     "intersect with the inequality."
                 )
-            self.__lower = max(self.__lower, (-b - math.sqrt(disc)) / (2 * a) + tau)
-            self.__upper = min(self.__upper, (-b + math.sqrt(disc)) / (2 * a) + tau)
+            self.__lower = max(
+                self.__lower, (-b - math.sqrt(disc)) / (2 * a) + tau)
+            self.__upper = min(
+                self.__upper, (-b + math.sqrt(disc)) / (2 * a) + tau)
             self.summary["convex"] += 1
         else:
             disc = b ** 2 - 4 * a * c  # discriminant
@@ -401,7 +456,7 @@ class SelectiveInferenceNormSE(SelectiveInferenceNorm):
                         break
                     elif intervals[i][0] < upper < intervals[i][1]:
                         right_intervals = [[upper, intervals[i][1]]] + intervals[
-                            i + 1 :
+                            i + 1:
                         ]
                         break
                 for i in range(len(intervals) - 1, -1, -1):
@@ -409,7 +464,8 @@ class SelectiveInferenceNormSE(SelectiveInferenceNorm):
                         left_intervals = intervals[: i + 1]
                         break
                     elif intervals[i][0] < lower < intervals[i][1]:
-                        left_intervals = intervals[:i] + [[intervals[i][0], lower]]
+                        left_intervals = intervals[:i] + \
+                            [[intervals[i][0], lower]]
                         break
                 intervals = left_intervals + right_intervals
             elif lower <= intervals[0][0] and intervals[-1][1] <= upper:
