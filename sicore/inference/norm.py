@@ -71,8 +71,7 @@ class NaiveInferenceNorm(InferenceNorm):
 
         Args:
             tail (str, optional): 'double' for double-tailed test, 'right' for
-                right-tailed test, and 'left' for left-tailed test. Defaults to
-                'double'.
+                right-tailed test, and 'left' for left-tailed test. Defaults to 'double'.
             popmean (float, optional): Population mean of `η'x` under null hypothesis.
                 Defaults to 0.
 
@@ -279,8 +278,8 @@ class SelectiveInferenceNorm(InferenceNorm):
 
         stat = standardize(self.stat, popmean, self.eta_sigma_eta)
         norm_intervals = standardize(intervals, popmean, self.eta_sigma_eta)
-        F = tn_cdf(stat, norm_intervals, dps=dps,
-                   max_dps=max_dps, out_log=out_log)
+        F = tn_cdf(stat, norm_intervals,
+                   dps=dps, max_dps=max_dps, out_log=out_log)
 
         return calc_pvalue(F, tail=tail)
 
@@ -362,10 +361,10 @@ class SelectiveInferenceNorm(InferenceNorm):
             norm_inf_intervals = standardize(
                 inf_intervals, popmean, self.eta_sigma_eta)
 
-            sup_F = tn_cdf(stat, norm_sup_intervals, dps=dps,
-                           max_dps=max_dps, out_log=out_log)
-            inf_F = tn_cdf(stat, norm_inf_intervals, dps=dps,
-                           max_dps=max_dps, out_log=out_log)
+            sup_F = tn_cdf(stat, norm_sup_intervals,
+                           dps=dps, max_dps=max_dps, out_log=out_log)
+            inf_F = tn_cdf(stat, norm_inf_intervals,
+                           dps=dps, max_dps=max_dps, out_log=out_log)
 
             inf_p, sup_p = calc_p_range(inf_F, sup_F, tail=tail)
 
