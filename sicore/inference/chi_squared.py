@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import math
 import numpy as np
 from scipy.linalg import fractional_matrix_power
 from ..utils import is_int_or_float
@@ -10,8 +9,7 @@ from .base import *
 
 class InferenceChiSquared(ABC):
     """
-    Base inference class for a test statistic which follows chi squared distribution under
-    null.
+    Base inference class for a test statistic which follows chi squared distribution under null.
 
     Args:
         data (array-like): Observation data of length `N`.
@@ -78,8 +76,7 @@ class NaiveInferenceChiSquared(InferenceChiSquared):
 
         Args:
             tail (str, optional): 'double' for double-tailed test, 'right' for
-                right-tailed test, and 'left' for left-tailed test. Defaults to
-                'right'.
+                right-tailed test, and 'left' for left-tailed test. Defaults to 'right'.
 
         Returns:
             float: p-value
@@ -91,8 +88,7 @@ class NaiveInferenceChiSquared(InferenceChiSquared):
 
 class SelectiveInferenceChiSquared(InferenceChiSquared):
     """
-    Selective inference for a test statistic which follows chi squared distribution under
-    null.
+    Selective inference for a test statistic which follows chi squared distribution under null.
 
     Args:
         data (array-like): Observation data of length `N`.
@@ -103,8 +99,8 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
 
     def __init__(self, data, var, basis, use_tf=False):
         super().__init__(data, var, basis, use_tf)
-        self.c = self.P_data / self.stat
-        self.z = self.data - self.P_data
+        self.c = self.P_data / self.stat  # `b` vector in para si.
+        self.z = self.data - self.P_data  # `a` vector in para si.
         self.intervals = [[NINF, INF]]
         self.searched_intervals = None
         self.mappings = None  # {interval1: model1, interval2: model2, ...}
@@ -179,7 +175,7 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
             param = (e + s) / 2
         return param
 
-    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10, model_selector=None, line_search=True, step=1e-7):
+    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10, model_selector=None, line_search=True, step=1e-10):
         """
         Perform parametric search.
 
@@ -187,12 +183,9 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
             algorithm (callable): Callable function which takes two vectors (`a`, `b`)
                 and a scalar `z` that can satisfy `data = a + b * z`
                 as arguments, and returns the selected model (any) and
-                the truncation intervals (array-like). When line_search option is activated,
-                algorithm needs to return only one interval (i.e. [l1, u1] or [[l1, u1]])
-                as the truncation intervals (array-like). A closure function might be
+                the truncation intervals (array-like). A closure function might be
                 helpful to implement this.
-            max_tail (float, optional): Maximum tail value to be searched. Defaults to
-                1000.
+            max_tail (float, optional): Maximum tail value to be searched. Defaults to 1000.
             tol (float, optional): Tolerance error parameter. Defaults to 1e-10.
             model_selector (callable, optional): Callable function which takes
                 a selected model (any) as single argument, and returns True
@@ -201,7 +194,7 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
                 calculated within this method. Defaults to None.
             line_search (boolean, optional): Whether to perform a line search or a random search
                 from unexplored regions. Defaults to True.
-            step (float, optional): Step width for line search. Defaults to 1e-7.
+            step (float, optional): Step width for line search. Defaults to 1e-10.
         """
         self.tol = tol
         self.step = step
@@ -254,13 +247,13 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
         Perform selective statistical testing.
 
         Args:
-            model_selector (callable, optional): Callable function which takes a selected model
-                (any) as single argument, and returns True if the model is used for the
-                testing, and False otherwise. This option is valid after calling
-                ``self.parametric_search()`` with model_selector None.
+            model_selector (callable, optional): Callable function which takes
+                a selected model (any) as single argument, and returns True
+                if the model is used for the testing, and False otherwise.
+                This option is valid after calling ``self.parametric_search()``
+                with model_selector None.
             tail (str, optional): 'double' for double-tailed test, 'right' for
-                right-tailed test, and 'left' for left-tailed test. Defaults to
-                right'.
+                right-tailed test, and 'left' for left-tailed test. Defaults to 'right'.
             dps (int, str, optional): dps value for mpmath. Set 'auto' to select dps
                 automatically. Defaults to 'auto'.
             max_dps (int, optional): Maximum dps value for mpmath. This option is valid
@@ -288,7 +281,109 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
         chi_intervals = intersection(
             intervals, [[1e-5, INF]])
         chi_squared_intervals = np.power(chi_intervals, 2)
-        chi = tc2_cdf_mpmath(stat, chi_squared_intervals,
-                             self.degree, dps=dps, out_log=out_log)
+        F = tc2_cdf_mpmath(stat, chi_squared_intervals, self.degree,
+                           dps=dps, max_dps=max_dps, out_log=out_log)
 
-        return calc_pvalue(chi, tail=tail)
+        return calc_pvalue(F, tail=tail)
+
+    def only_check_reject_or_not(
+        self, algorithm, model_selector, significance_level=0.05, tol=1e-10, step=1e-10, tail="double", popmean=0, dps="auto", out_log='test_log.log', max_dps=5000
+    ):
+        """
+        Only check whether the null hypothesis is rejected or not in selective statistical test.
+
+        Args:
+            algorithm (callable): Callable function which takes two vectors (`a`, `b`)
+                and a scalar `z` that can satisfy `data = a + b * z`
+                as arguments, and returns the selected model (any) and
+                the truncation intervals (array-like). A closure function might be
+                helpful to implement this.
+            model_selector (callable): Callable function which takes
+                a selected model (any) as single argument, and returns True
+                if the model is used for the testing, and False otherwise.
+            significance_level (float, optional): Significance level value for
+                selective statistical tests. Defaults to 0.05.
+            tol (float, optional): Tolerance error parameter. Defaults to 1e-10.
+            step (float, optional): Step width for next search. Defaults to 1e-10.
+            tail (str, optional): 'double' for double-tailed test, 'right' for
+                right-tailed test, and 'left' for left-tailed test. Defaults to 'double'.
+            popmean (float, optional): Population mean of `η^T x` under null hypothesis.
+                Defaults to 0.
+            dps (int, str, optional): dps value for mpmath. Set 'auto' to select dps
+                automatically. Defaults to 'auto'.
+            max_dps (int, optional): Maximum dps value for mpmath. This option is valid
+                when `dps` is set to 'auto'. Defaults to 5000.
+
+        Returns:
+            (boolean, float, float): (
+                whether null hypothesis is reject or not,
+                lower bound of p-value obtained in the final,
+                upper bound of p-value obtained in the final,)
+        """
+        self.tol = tol
+        self.step = step
+        self.searched_intervals = list()
+        truncated_intervals = list()
+
+        self.count = 0
+        self.detect_count = 0
+
+        stat = float(self.stat) ** 2
+
+        z = self.stat
+        while True:
+            if self.count > 1e5:
+                raise Exception(
+                    'The number of searches exceeds 10,000 times, suggesting an infinite loop.')
+            self.count += 1
+
+            model, interval = algorithm(self.z, self.c, z)
+            interval = np.asarray(interval)
+            intervals = _interval_to_intervals(interval)
+
+            if model_selector(model):
+                truncated_intervals += intervals
+                self.detect_count += 1
+
+            self.searched_intervals = union_all(
+                self.searched_intervals + intervals, tol=self.tol)
+
+            unsearched_intervals = not_(self.searched_intervals)
+            s = intersection(unsearched_intervals, [
+                             NINF, float(self.stat)])[-1][1]
+            e = intersection(unsearched_intervals, [
+                             float(self.stat), INF])[0][0]
+
+            sup_intervals = union_all(
+                truncated_intervals + [[NINF, s]], tol=self.tol)
+            inf_intervals = union_all(
+                truncated_intervals + [[e, INF]], tol=self.tol)
+
+            chi_sup_intervals = intersection(
+                sup_intervals, [[1e-5, INF]])
+            chi_inf_intervals = intersection(
+                inf_intervals, [[1e-5, INF]])
+
+            chi_squared_sup_intervals = np.power(chi_sup_intervals, 2)
+            chi_squared_inf_intervals = np.power(chi_inf_intervals, 2)
+
+            sup_F = tc2_cdf_mpmath(stat, chi_squared_sup_intervals, self.degree,
+                                   dps=dps, max_dps=max_dps, out_log=out_log)
+            inf_F = tc2_cdf_mpmath(stat, chi_squared_inf_intervals, self.degree,
+                                   dps=dps, max_dps=max_dps, out_log=out_log)
+
+            inf_p, sup_p = calc_p_range(inf_F, sup_F, tail=tail)
+
+            if sup_p <= significance_level:
+                return True, inf_p, sup_p
+            if inf_p > significance_level:
+                return False, inf_p, sup_p
+
+            z_l = s - self.step
+            z_r = e + self.step
+
+            if float(self.stat) - z_l < z_r - float(self.stat):
+                if z_l >= 1e-5:
+                    z = z_l
+            else:
+                z = z_r
