@@ -66,8 +66,8 @@ $ pip uninstall sicore
 - intervals.poly_lt_zero()：多項式の0以下となる区間を計算
 
 **その他の便利な機能**
-- utils.OneVec：特定の場所が1，それ以外が0のベクトルを生成
-- intervals.polytope_to_interval:二次形式の選択イベントを与えると，それを切断区間へと変換する関数
+- OneVec：特定の場所が1，それ以外が0のベクトルを生成
+- polytope_to_interval()：二次形式の選択イベントを切断区間へと変換する関数
 
 ## その他
 テストの実行：
