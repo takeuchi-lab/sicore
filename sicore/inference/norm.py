@@ -9,8 +9,7 @@ from .base import *
 
 class InferenceNorm(ABC):
     """
-    Base inference class for a test statistic which follows normal distribution under
-    null.
+    Base inference class for a test statistic which follows normal distribution under null.
 
     Args:
         data (array-like): Observation data of length `N`.
@@ -87,8 +86,7 @@ class NaiveInferenceNorm(InferenceNorm):
 
 class SelectiveInferenceNorm(InferenceNorm):
     """
-    Selective inference for a test statistic which follows normal distribution under
-    null.
+    Selective inference for a test statistic which follows normal distribution under null.
 
     Args:
         data (array-like): Observation data of length `N`.
@@ -99,8 +97,8 @@ class SelectiveInferenceNorm(InferenceNorm):
 
     def __init__(self, data, var, eta, use_tf=False):
         super().__init__(data, var, eta, use_tf)
-        self.c = self.sigma_eta / self.eta_sigma_eta
-        self.z = data - self.stat * self.c
+        self.c = self.sigma_eta / self.eta_sigma_eta  # `b` vector in para si.
+        self.z = data - self.stat * self.c  # `a` vecotr in para si.
         self.intervals = [[NINF, INF]]
         self.searched_intervals = None
         self.mappings = None  # {interval1: model1, interval2: model2, ...}
@@ -175,7 +173,7 @@ class SelectiveInferenceNorm(InferenceNorm):
             param = (e + s) / 2
         return param
 
-    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10, model_selector=None, line_search=True, step=1e-7):
+    def parametric_search(self, algorithm, max_tail=1000, tol=1e-10, model_selector=None, line_search=True, step=1e-10):
         """
         Perform parametric search.
 
@@ -183,12 +181,9 @@ class SelectiveInferenceNorm(InferenceNorm):
             algorithm (callable): Callable function which takes two vectors (`a`, `b`)
                 and a scalar `z` that can satisfy `data = a + b * z`
                 as arguments, and returns the selected model (any) and
-                the truncation intervals (array-like). When line_search option is activated,
-                algorithm needs to return only one interval (i.e. [l1, u1] or [[l1, u1]])
-                as the truncation intervals (array-like). A closure function might be
+                the truncation intervals (array-like). A closure function might be
                 helpful to implement this.
-            max_tail (float, optional): Maximum tail value to be searched. Defaults to
-                1000.
+            max_tail (float, optional): Maximum tail value to be searched. Defaults to 1000.
             tol (float, optional): Tolerance error parameter. Defaults to 1e-10.
             model_selector (callable, optional): Callable function which takes
                 a selected model (any) as single argument, and returns True
@@ -197,7 +192,7 @@ class SelectiveInferenceNorm(InferenceNorm):
                 calculated within this method. Defaults to None.
             line_search (boolean, optional): Whether to perform a line search or a random search
                 from unexplored regions. Defaults to True.
-            step (float, optional): Step width for line search. Defaults to 1e-7.
+            step (float, optional): Step width for line search. Defaults to 1e-10.
         """
         self.tol = tol
         self.step = step
@@ -250,13 +245,13 @@ class SelectiveInferenceNorm(InferenceNorm):
         Perform selective statistical testing.
 
         Args:
-            model_selector (callable, optional): Callable function which takes a selected model
-                (any) as single argument, and returns True if the model is used for the
-                testing, and False otherwise. This option is valid after calling
-                ``self.parametric_search()`` with model_selector None.
+            model_selector (callable, optional): Callable function which takes
+                a selected model (any) as single argument, and returns True
+                if the model is used for the testing, and False otherwise.
+                This option is valid after calling ``self.parametric_search()``
+                with model_selector None.
             tail (str, optional): 'double' for double-tailed test, 'right' for
-                right-tailed test, and 'left' for left-tailed test. Defaults to
-                'double'.
+                right-tailed test, and 'left' for left-tailed test. Defaults to 'double'.
             popmean (float, optional): Population mean of `η^T x` under null hypothesis.
                 Defaults to 0.
             dps (int, str, optional): dps value for mpmath. Set 'auto' to select dps
@@ -309,8 +304,7 @@ class SelectiveInferenceNorm(InferenceNorm):
             tol (float, optional): Tolerance error parameter. Defaults to 1e-10.
             step (float, optional): Step width for next search. Defaults to 1e-10.
             tail (str, optional): 'double' for double-tailed test, 'right' for
-                right-tailed test, and 'left' for left-tailed test. Defaults to
-                'double'.
+                right-tailed test, and 'left' for left-tailed test. Defaults to 'double'.
             popmean (float, optional): Population mean of `η^T x` under null hypothesis.
                 Defaults to 0.
             dps (int, str, optional): dps value for mpmath. Set 'auto' to select dps
