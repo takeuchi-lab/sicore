@@ -31,10 +31,34 @@ def calc_pvalue(F, tail='double'):
         return float(F)
 
 
+def calc_p_range(inf_F, sup_F, tail='double'):
+    """
+    Calculate possible range of p-value.
+
+    Args:
+        inf_F (float): Infimum of CDF value at the observed test statistic.
+        sup_F (float): Supremum of CDF value at the observed test statistic.
+        tail (str, optional): Set 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test. Defaults to 'double'.
+
+    Returns:
+        (float, float): (Infimum of p-value, Supremum of p-value)
+    """
+    if tail == 'double':
+        sup_p = float(2 * min(sup_F, 1 - inf_F))
+        inf_p = float(2 * min(inf_F, 1 - sup_F))
+    elif tail == 'right':
+        sup_p = float(1 - inf_F)
+        inf_p = float(1 - sup_F)
+    elif tail == 'left':
+        sup_p = float(sup_F)
+        inf_p = float(inf_F)
+    return (inf_p, sup_p)
+
+
 def standardize(x, mean=0, var=1):
     """
     Standardize a random variable.
-    
+
     Args:
         x (float, list): The value of random variable.
         mean (float, optional): Mean. Defaults to 0.

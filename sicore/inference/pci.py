@@ -19,18 +19,19 @@ class PCI(ABC):
         var (float, list): Value of known variance, or `N` * `N` covariance matrix.
         eta (array-like): `N` dimensional vector of test direction.
     """
+
     def __init__(self, data, var, eta, delta):
         self.data = data.T.flatten()
         self.var = var
         self.eta = eta
         self.delta = delta
         self.length = data.shape[0]
-        
+
         if is_int_or_float(var):
             self.cov = var * np.identity(self.length)
         else:
             self.cov = np.asarray(var)
-        
+
         if is_int_or_float(delta):
             self.stat = 1
             self.sigma_eta = 1
@@ -58,6 +59,7 @@ class NaivePCINorm(PCI):
         var (float, list): Value of known variance, or `N` * `N`covariance matrix.
         eta (array-like): `N` dimensional vector of test direction. Unlike ``SelectiveInference.test()``, the vector input here has to be constructed without taking absolute value of the test statistic.
     """
+
     def test(self, tail='double', popmean=0):
         """
         Perform naive statistical testing.
@@ -76,7 +78,7 @@ class NaivePCINorm(PCI):
 
 class SelectivePCINorm(PCI):
     """
-    Selective inference for a test statistic which follows normal distribution under null. 
+    Selective inference for a test statistic which follows normal distribution under null.
     Use this class if you already have truncation intervals at hand.
 
     Args:
@@ -84,15 +86,16 @@ class SelectivePCINorm(PCI):
         var (float, list): Value of known variance, or `N` * `N` covariance matrix.
         eta (array-like): `N` dimensional vector of test direction.
     """
+
     def __init__(self, data, var, eta, delta):
         super().__init__(data, var, eta, delta)
         if is_int_or_float(delta):
             self.c = 1
             self.z = 1
         else:
-            self.c = (self.sigma_eta / self.eta_sigma_eta).reshape(self.sigma_eta.shape[0])
+            self.c = (self.sigma_eta /
+                      self.eta_sigma_eta).reshape(self.sigma_eta.shape[0])
             self.z = data.T.flatten() - self.stat * self.c
-
 
     def test(self, intervals, tail='double', popmean=0, dps='auto', out_log='test_log.log', max_dps=5000):
         """
@@ -102,14 +105,14 @@ class SelectivePCINorm(PCI):
             interval (array-like): Truncation interval [L, U] or [[L1, U1], [L2, U2],...].
             model_selector (callable): Callable function which takes a selected model (any) as single argument, and returns True if the model is used for the testing, and False otherwise.
                 This option is valid after calling ``self.parametric_search()``.
-            tail (str, optional): 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test. 
+            tail (str, optional): 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test.
                 Defaults to 'double'.
-            popmean (float, optional): Population mean of `η^T x` under null hypothesis is true. 
+            popmean (float, optional): Population mean of `η^T x` under null hypothesis is true.
                 Defaults to 0.
-            dps (int, str, optional): dps value for mpmath. 
-                Set 'auto' to select dps automatically. 
+            dps (int, str, optional): dps value for mpmath.
+                Set 'auto' to select dps automatically.
                 Defaults to 'auto'.
-            max_dps (int, optional): Maximum dps value for mpmath. 
+            max_dps (int, optional): Maximum dps value for mpmath.
                 This option is valid when `dps` is set to 'auto'.
                 Defaults to 5000.
 
@@ -118,27 +121,30 @@ class SelectivePCINorm(PCI):
         """
 
         self.interval = np.asarray(intervals)
-        
+
         stat = standardize(self.stat, popmean, self.eta_sigma_eta)
-        norm_intervals = standardize(self.interval, popmean, self.eta_sigma_eta)
-        F = tn_cdf(stat, norm_intervals, dps=dps, max_dps=max_dps, out_log=out_log)
+        norm_intervals = standardize(
+            self.interval, popmean, self.eta_sigma_eta)
+        F = tn_cdf(stat, norm_intervals, dps=dps,
+                   max_dps=max_dps, out_log=out_log)
         return calc_pvalue(F, tail=tail)
 
 
 class SelectivePCINormSE(SelectivePCINorm):
     """
-    Selective inference for a test statistic which follows normal distribution under null. 
+    Selective inference for a test statistic which follows normal distribution under null.
     Truncation intervals are calculated from selection events using the method proposed by Lee et al.
 
     Args:
         data (array-like): Observation data of length `N`.
         var (float, list): Value of known variance, or `N` * `N` covariance matrix.
         eta (array-like): `N` dimensional vector of test direction.
-        init_lower (float, optional): Initial lower interval. 
+        init_lower (float, optional): Initial lower interval.
             Defaults to -inf.
-        init_upper (float, optional): Initial upper interval. 
+        init_upper (float, optional): Initial upper interval.
             Defaults to inf.
     """
+
     def __init__(self, data, var, eta, delta, init_lower=NINF, init_upper=INF):
         super().__init__(data, var, eta, delta)
         self.__lower = init_lower
@@ -150,10 +156,8 @@ class SelectivePCINormSE(SelectivePCINorm):
             'concave': 0
         }
 
-
     def parametric_test(self, interval, tail='double', popmean=0, dps='auto'):
         return self.test(interval, tail=tail, popmean=popmean, dps=dps)
-
 
     def add_selection_event(self, A=None, b=None, c=None):
         """
@@ -163,8 +167,8 @@ class SelectivePCINormSE(SelectivePCINorm):
             A (array-like, optional): `N`*`N` matrix.
                 Set None if `A` is unused.
                 Defaults to None.
-            b (array-like, optional): `N` dimensional vector. 
-                Set None if `b` is unused. 
+            b (array-like, optional): `N` dimensional vector.
+                Set None if `b` is unused.
                 Defaults to None.
             c (float, optional): Constant.
                 Set None if `c` is unused.
@@ -188,7 +192,6 @@ class SelectivePCINormSE(SelectivePCINorm):
 
         self.cut_interval(alp, beta, gam)
 
-
     def cut_interval(self, a, b, c, tau=False):
         """
         Truncate the interval with a quadratic inequality `ατ^2 + βτ + γ ≦ 0`, where `τ` is test statistic, and `β`, `γ` are function of `c`, `z` respectively.
@@ -196,7 +199,7 @@ class SelectivePCINormSE(SelectivePCINorm):
         This method truncates the interval only when the inequality is convex in order to reduce calculation cost.
         Truncation intervals for concave inequalities are stored in ``self.__concave_intervals``.
         The final truncation intervals are calculated when ``self.get_intervals()`` is called.
-        
+
         Args:
             a (float): `α`. Set 0 if the inequality is linear.
             b (float): `β` or `κ`.
@@ -240,8 +243,10 @@ class SelectivePCINormSE(SelectivePCINorm):
                     "Test direction of interest does not "
                     "intersect with the inequality."
                 )
-            self.__lower = max(self.__lower, (-b - math.sqrt(disc)) / (2 * a) + tau)
-            self.__upper = min(self.__upper, (-b + math.sqrt(disc)) / (2 * a) + tau)
+            self.__lower = max(
+                self.__lower, (-b - math.sqrt(disc)) / (2 * a) + tau)
+            self.__upper = min(
+                self.__upper, (-b + math.sqrt(disc)) / (2 * a) + tau)
             self.summary['convex'] += 1
         else:
             disc = b ** 2 - 4 * a * c  # discriminant
@@ -298,14 +303,16 @@ class SelectivePCINormSE(SelectivePCINorm):
                         right_intervals = intervals[i:]
                         break
                     elif intervals[i][0] < upper < intervals[i][1]:
-                        right_intervals = [[upper, intervals[i][1]]] + intervals[i + 1:]
+                        right_intervals = [
+                            [upper, intervals[i][1]]] + intervals[i + 1:]
                         break
                 for i in range(len(intervals) - 1, -1, -1):
                     if intervals[i][1] <= lower:
                         left_intervals = intervals[:i + 1]
                         break
                     elif intervals[i][0] < lower < intervals[i][1]:
-                        left_intervals = intervals[:i] + [[intervals[i][0], lower]]
+                        left_intervals = intervals[:i] + \
+                            [[intervals[i][0], lower]]
                         break
                 intervals = left_intervals + right_intervals
             elif lower <= intervals[0][0] and intervals[-1][1] <= upper:
@@ -321,18 +328,18 @@ class SelectivePCINormSE(SelectivePCINorm):
         Perform selective statistical testing.
 
         Args:
-            tail (str, optional): 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test. 
+            tail (str, optional): 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test.
                 Defaults to 'double'.
             popmean (float, optional): Population mean of `η'x` under null hypothesis is true. Defaults to 0.
             dps (int, str, optional): dps value for mpmath. Set 'auto' to select dps automatically. Defaults to 'auto'.
             max_dps (int, optional): Maximum dps value for mpmath.
-                This option is valid when `dps` is set to 'auto'. 
+                This option is valid when `dps` is set to 'auto'.
                 Defaults to 5000.
 
         Returns:
             float: p-value
         """
-        
+
         return super().test(intervals, tail=tail, popmean=popmean, dps=dps, out_log=out_log)
 
 
@@ -345,6 +352,7 @@ class NaivePCIChiSquared(PCI):
         var (float, list): Value of known variance, or `N`*`N`covariance matrix.
         eta (array-like): `N` dimensional vector of test direction. Unlike ``SelectiveInference.test()``, the vector input here has to be constructed without taking absolute value of the test statistic.
     """
+
     def test(self, data, tail='double'):
         """
         chi2 test
@@ -361,14 +369,14 @@ class NaivePCIChiSquared(PCI):
         eta_data = np.dot(p, data)
         P_vecx = eta_data.T.flatten()
         self.stat = np.linalg.norm(P_vecx, ord=2) / math.sqrt(sigma_hat[0][0])
-        
+
         chi = chi2_cdf(self.stat ** 2, data.shape[1])
         return calc_pvalue(chi, tail=tail)
 
 
 class SelectivePCIChiSquared(PCI):
     """
-    Selective inference for a test statistic which follows chi squared distribution under null. 
+    Selective inference for a test statistic which follows chi squared distribution under null.
     Use this class if you already have truncation intervals at hand.
 
     Args:
@@ -376,6 +384,7 @@ class SelectivePCIChiSquared(PCI):
         var (float, list): Value of known variance, or `N` * `N` covariance matrix.
         eta (array-like): `N` dimensional vector of test direction.
     """
+
     def __init__(self, data, var, eta, delta):
         super().__init__(data, var, eta, delta)
         if is_int_or_float(delta):
@@ -383,9 +392,9 @@ class SelectivePCIChiSquared(PCI):
             self.c = 1
             self.z = 1
         else:
-            self.c = (self.sigma_eta / self.eta_sigma_eta).reshape(self.sigma_eta.shape[0])
+            self.c = (self.sigma_eta /
+                      self.eta_sigma_eta).reshape(self.sigma_eta.shape[0])
             self.z = data.T.flatten() - self.stat * self.c
-
 
     def test(self, intervals, tail='double', popmean=0, dps='auto', out_log='test_log.log'):
         """
@@ -393,12 +402,12 @@ class SelectivePCIChiSquared(PCI):
 
         Args:
             interval (array-like): Truncation interval [L, U] or [[L1, U1], [L2, U2],...].
-            tail (str, optional): 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test. 
+            tail (str, optional): 'double' for double-tailed test, 'right' for right-tailed test, and 'left' for left-tailed test.
                 Defaults to 'double'.
-            popmean (float, optional): Population mean of `η^T x` under null hypothesis is true. 
+            popmean (float, optional): Population mean of `η^T x` under null hypothesis is true.
                 Defaults to 0.
-            dps (int, str, optional): dps value for mpmath. 
-                Set 'auto' to select dps automatically. 
+            dps (int, str, optional): dps value for mpmath.
+                Set 'auto' to select dps automatically.
                 Defaults to 'auto'.
 
         Returns:
@@ -406,27 +415,29 @@ class SelectivePCIChiSquared(PCI):
         """
 
         self.interval = np.asarray(intervals)
-        
+
         stat = standardize(self.stat, popmean, self.eta_sigma_eta)
-        norm_intervals = standardize(self.interval, popmean, self.eta_sigma_eta)
+        norm_intervals = standardize(
+            self.interval, popmean, self.eta_sigma_eta)
         F = tn_cdf(stat, norm_intervals, dps=dps, out_log=out_log)
         return calc_pvalue(F, tail=tail)
 
 
 class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
     """
-    Selective inference for a test statistic which follows chi squared distribution under null. 
+    Selective inference for a test statistic which follows chi squared distribution under null.
     Truncation intervals are calculated from selection events using the method proposed by Lee et al.
 
     Args:
         data (array-like): Observation data of length `N`.
         var (float, list): Value of known variance, or `N` * `N` covariance matrix.
         eta (array-like): `N` dimensional vector of test direction.
-        init_lower (float, optional): Initial lower interval. 
+        init_lower (float, optional): Initial lower interval.
             Defaults to -inf.
-        init_upper (float, optional): Initial upper interval. 
+        init_upper (float, optional): Initial upper interval.
             Defaults to inf.
     """
+
     def __init__(self, data, var, eta, delta, init_lower=NINF, init_upper=INF):
         super().__init__(data, var, eta, delta)
         self.__lower = init_lower
@@ -437,7 +448,6 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
             'convex': 0,
             'concave': 0
         }
-
 
     def make_sigma_hat(self, data, eta):
         if isinstance(self.var, (int, float)):
@@ -457,7 +467,6 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
 
         return sigma_hat
 
-
     def test_chi2(self, data, intervals, tail='double', dps='auto', out_log='test_log.log'):
         """
         truncated chi2 test
@@ -465,13 +474,12 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
         """
 
         self.interval = np.asarray(intervals)
-        chi = tc2_cdf(self.stat**2, np.power(self.interval, 2), data.shape[1], dps=dps, out_log=out_log)
+        chi = tc2_cdf(self.stat**2, np.power(self.interval, 2),
+                      data.shape[1], dps=dps, out_log=out_log)
         return calc_pvalue(chi, tail=tail)
-
 
     def parametric_test(self, interval, tail='double', popmean=0, dps='auto'):
         return self.test(interval, tail=tail, popmean=popmean, dps=dps)
-
 
     def add_selection_event(self, A=None, b=None, c=None):
         """
@@ -481,8 +489,8 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
             A (array-like, optional): `N`*`N` matrix.
                 Set None if `A` is unused.
                 Defaults to None.
-            b (array-like, optional): `N` dimensional vector. 
-                Set None if `b` is unused. 
+            b (array-like, optional): `N` dimensional vector.
+                Set None if `b` is unused.
                 Defaults to None.
             c (float, optional): Constant.
                 Set None if `c` is unused.
@@ -506,7 +514,6 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
 
         self.cut_interval(alp, beta, gam)
 
-
     def cut_interval(self, a, b, c, tau=False):
         """
         Truncate the interval with a quadratic inequality `ατ^2 + βτ + γ ≦ 0`, where `τ` is test statistic, and `β`, `γ` are function of `c`, `z` respectively.
@@ -514,7 +521,7 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
         This method truncates the interval only when the inequality is convex in order to reduce calculation cost.
         Truncation intervals for concave inequalities are stored in ``self.__concave_intervals``.
         The final truncation intervals are calculated when ``self.get_intervals()`` is called.
-        
+
         Args:
             a (float): `α`. Set 0 if the inequality is linear.
             b (float): `β` or `κ`.
@@ -558,8 +565,10 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
                     "Test direction of interest does not "
                     "intersect with the inequality."
                 )
-            self.__lower = max(self.__lower, (-b - math.sqrt(disc)) / (2 * a) + tau)
-            self.__upper = min(self.__upper, (-b + math.sqrt(disc)) / (2 * a) + tau)
+            self.__lower = max(
+                self.__lower, (-b - math.sqrt(disc)) / (2 * a) + tau)
+            self.__upper = min(
+                self.__upper, (-b + math.sqrt(disc)) / (2 * a) + tau)
             self.summary['convex'] += 1
         else:
             disc = b ** 2 - 4 * a * c  # discriminant
@@ -616,14 +625,16 @@ class SelectivePCIChiSquaredSE(SelectivePCIChiSquared):
                         right_intervals = intervals[i:]
                         break
                     elif intervals[i][0] < upper < intervals[i][1]:
-                        right_intervals = [[upper, intervals[i][1]]] + intervals[i + 1:]
+                        right_intervals = [
+                            [upper, intervals[i][1]]] + intervals[i + 1:]
                         break
                 for i in range(len(intervals) - 1, -1, -1):
                     if intervals[i][1] <= lower:
                         left_intervals = intervals[:i + 1]
                         break
                     elif intervals[i][0] < lower < intervals[i][1]:
-                        left_intervals = intervals[:i] + [[intervals[i][0], lower]]
+                        left_intervals = intervals[:i] + \
+                            [[intervals[i][0], lower]]
                         break
                 intervals = left_intervals + right_intervals
             elif lower <= intervals[0][0] and intervals[-1][1] <= upper:
