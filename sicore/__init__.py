@@ -42,6 +42,8 @@ __all__ = [
     "NaiveInferenceNorm",
     "SelectiveInferenceNorm",
     "SelectiveInferenceNormSE",
+    "NaiveInferenceChiSquared",
+    "SelectiveInferenceChiSquared",
     "NaivePCINorm",
     "SelectivePCINorm",
     "SelectivePCINormSE",
