@@ -1,0 +1,4 @@
+sicore.egg-info
+sicore/__pycache__
+tests/__pycache__
+build
