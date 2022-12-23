@@ -39,6 +39,6 @@ class OneVec:
         if j is None:
             vec[i - 1] = 1
         else:
-            vec[i - 1 : j] = 1
+            vec[i - 1: j] = 1
 
         return vec

@@ -23,6 +23,7 @@ $ pip uninstall sicore
 - SelectiveInferenceNorm：正規分布に従う検定統計量に対するselectiveな検定
     - Selection Eventの次数は制限なし
     - Parametric SI対応
+    - 帰無仮説を棄却するか否かのみを判定する高速なメソッドを利用可能
 - SelectiveInferenceNormSE：正規分布に従う検定統計量に対するselectiveな検定
     - 古い実装（互換性保持のため残している）
     - 2次までのSelection Eventにしか対応しないが，SelectiveInferenceNormより高速
@@ -30,11 +31,12 @@ $ pip uninstall sicore
 - NaiveInferenceChiSquared：カイ二乗検定に従う検定統計量に対するnaiveな検定
 - SelectiveInferenceChiSquared：カイ二乗分布に従う検定統計量に対するselectiveな検定
     - Selection Eventの次数は制限なし
-    - Parametric SI対応 
+    - Parametric SI対応
+    - 帰無仮説を棄却するか否かのみを判定する高速なメソッドを利用可能
 - two_sample_test()：naiveな1標本検定
 - one_sample_test()：naiveな2標本検定
 
-**切断分布**  
+**切断分布**
 全て複数の切断区間に対応し，mpmathを用いた任意精度の計算
 - tn_cdf()：切断正規分布
 - tt_cdf()：切断t分布
@@ -65,7 +67,7 @@ $ pip uninstall sicore
 
 **その他の便利な機能**
 - OneVec：特定の場所が1，それ以外が0のベクトルを生成
-
+- polytope_to_interval()：二次形式の選択イベントを切断区間へと変換する関数
 
 ## その他
 テストの実行：
