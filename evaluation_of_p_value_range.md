@@ -17,7 +17,7 @@ $$
     p(R)= \begin{cases}
           g(R)                    & \text{(left)}   \\
              1-g(R)                  & \text{(right)}  \\
-          2\min\{g(R), 1-g(R)\} & \text{(double)}
+          2\min\lbrace g(R), 1-g(R)\rbrace & \text{(double)}
        \end{cases}
 $$
 - $i$ を探索の回数を表す添字とする.
@@ -63,40 +63,70 @@ $$
   初めて探索される領域に限られることから, $R_{i+1}\setminus R_i \subset S_{i+1}\setminus S_i$
   が成立して, これと $S_{i+1}\subset \mathbb{R}$ , $(s_i, e_i)\subset S_i$ を合わせることで
   式(2)が得られる.
-- $\mathcal{R}$ の部分集合として $\mathbb{R}$ の部分集合族 $\mathcal{R}_i$ を次のように定める.
+- $\mathcal{R}$ の部分集合として $\mathbb{R}$ の部分集合族 $\mathcal{R}_ i$ を次のように定める.
 
 $$
-    \mathcal{R}_i = \lbrace R\in\mathcal{R}\mid R_i\subset R, 
+    \mathcal{R}_ i = \lbrace R\in\mathcal{R} \mid R_i\subset R, 
     R\setminus R_i\subset \mathbb{R}\setminus (s_i,e_i)\rbrace
 $$
-- 式(1), (2)と定義から明らかに集合列 $\lbrace \mathcal{R} _ i \rbrace_{i\in\mathbb{N}}$
-  は単調減少列となる. 特に定義から $\mathcal{R}_ \infty=\lbrace R_\infty \rbrace$
-  が成立するため, 任意の $i$ に対して $R_\infty\in\mathcal{R}_ i$ となる.
+- 式(1), (2)と定義に基づけば集合列 $\lbrace \mathcal{R} _ i \rbrace_{i\in\mathbb{N}}$
+  は単調減少列となる. つまり任意の $i$ に対して, 任意の $R\in\mathcal{R}_ {i+1}$ が
+  $R\in\mathcal{R}_ i$ を満たす. 実際, $R\in\mathcal{R}_ {i+1}$ であることと式(1)とから
+  $R\in \mathcal{R}_ i$がまず成立する. 続いて $R\setminus R_{i+1}\subset \mathbb{R}\setminus (s_{i+1}, e_{i+1})$
+  が成立していることと式(2)を用いれば次のようにして $R\setminus R_i \subset \mathbb{R}\setminus (s_i, e_i)$
+  が成立して $R\in\mathcal{R}_ i$ が示される.
+  
+$$
+    \begin{align*}
+    R\setminus R_i &= R\cap R_i^c = R\cap R_i^c \cap (R_{i+1}\cup R_{i+1}^c) \\
+    &= (R\cap R_{i+1}\setminus R_i)\cup (R\setminus R_{i+1}\cap R_i^c) \\
+    &\subset R_{i+1}\setminus R_i \cup R\setminus R_{i+1} \subset \mathbb{R}\setminus (s_i, e_i)
+    \end{align*}
+$$
+- 集合族 $\mathcal{R}_ i$ の定義と集合列 $\lbrace \mathcal{R} _ i \rbrace_{i\in\mathbb{N}}$ の単調減少性から
+  明らかに $\mathcal{R}_ \infty=\lbrace R_\infty \rbrace$
+  が成立して, 特に任意の $i$ に対して $R_\infty\in\mathcal{R}_ i$ となる.
 
 ## 目的の閉区間の列の構成
 
-先の議論から任意の $i$ に対して $R_\infty\in\mathcal{R}_i$ であるため
+先の議論から任意の $i$ に対して $R_\infty\in\mathcal{R}_ i$ であるため次が成立する.
 
 $$
     \inf_{R\in\mathcal{R}_i}g(R)\leq g(R_\infty) \leq \sup_{R\in\mathcal{R}_i}g(R) \tag{3}
 $$
 
-が成立する. ここで両辺はそれぞれ, 写像 $g$ と集合族 $\mathcal{R}_ i$ の定義と $s_i\leq t\leq e_i$ であることから
+続いて式(3)の両辺をそれぞれ明示的に書き下す. まず写像 $g$ と累積分布関数の定義から任意の $R\in\mathcal{R}_ i$ に対して $g(R)$ は
+次のように変形できる.
+
+$$
+    \begin{align*}
+    g(R) &= F^R(t) = \frac{\int_{R\cap [-\infty, t]}F(x)dx}{\int_R F(x)dx} \\
+    &= \frac{\int_{R\cap [-\infty, t]}F(x)dx}{\int_{R\cap [-\infty, t]}F(x)dx + \int_{R\cap [t, \infty]}F(x)dx} \\
+    &= \frac{1}{1 + \left( \int_{R\cap [t, \infty]}F(x)dx / \int_{R\cap [-\infty, t]}F(x)dx \right)} 
+    \end{align*}
+$$
+
+この結果から $g(R)$ の下限と上限を求めるには $J(R) = \int_{R\cap [t, \infty]}F(x)dx / \int_{R\cap [-\infty, t]}F(x)dx$ 
+の上限と下限を求めれば良い. ここで恒等的に $F(X)\geq 0$ であることに注意すると
+
+集合族 $\mathcal{R}_ i$ の定義と $s_i\leq t\leq e_i$ であることから
 累積分布関数の定義に注意すれば次のようにして計算することができる.
 
 $$
-    \inf_{R\in\mathcal{R}_i}g(R) = F^{R_i\cup [e_i,\infty]}(t)
+    \inf_{R\in\mathcal{R}_ i}g(R) = F^{R_i\cup [e_i,\infty]}(t)
 $$
 
 $$
-    \sup_{R\in\mathcal{R}_i}g(R) = F^{R_i\cup [-\infty, s_i]}(t)
+    \sup_{R\in\mathcal{R}_ i}g(R) = F^{R_i\cup [-\infty, s_i]}(t)
 $$
 
 また2つの実数列
 $\lbrace \inf_{R\in\mathcal{R} _ i} g(R) \rbrace _ {i\in\mathbb{N}}$, $\lbrace \sup_{R\in\mathcal{R} _ i} g(R)\rbrace _ {i\in\mathbb{N}}$
-はそれぞれ, 上限と下限の定義と集合列 $\lbrace\mathcal{R}_ i\rbrace_{i\in\mathbb{N}}$ の単調減少性
-とから, 単調増加列と単調減少列となる. さらに $\mathcal{R}_ \infty=\lbrace R_\infty\rbrace$ であることから
-これらの実数列は共に $g(R_\infty)$ へと収束する.
+はそれぞれ, 下限と上限の定義と集合列 $\lbrace\mathcal{R}_ i\rbrace_{i\in\mathbb{N}}$ の単調減少性
+とから, 単調増加列と単調減少列となる. したがって $g$ の有界性と合わせて, これらの実数列は共に
+収束する. ここで $\mathcal{R}_ \infty=\lbrace R_\infty\rbrace$ であることと, ふたたび
+集合列 $\lbrace\mathcal{R}_ i\rbrace_{i\in\mathbb{N}}$ の単調減少性とから, これらの実数列の極限は
+共に $g(R_\infty)$ となる.
 
 それぞれの検定方式に対して真の $p$ 値を $p^{\mathrm{left}},p^{\mathrm{right}},p^{\mathrm{double}}$ と
 表すこととすれば, 写像 $p$ の定義と上に示した $g(R^\infty)$ に関する不等式とから, 任意の $i$ に対して
@@ -104,12 +134,12 @@ $\lbrace \inf_{R\in\mathcal{R} _ i} g(R) \rbrace _ {i\in\mathbb{N}}$, $\lbrace \
 $$
 \begin{align*}
     p^{\mathrm{left}} & = g(R_\infty)                                                                                    \\
-                          & \in [\inf_{R\in\mathcal{R}_i}g(R), \sup_{R\in\mathcal{R}_ i}g(R)] \\&=I_i^{\mathrm{left}}        \\
+                          & \in \left[ \inf_{R\in\mathcal{R}_ i}g(R), \sup_{R\in\mathcal{R}_ i}g(R) \right] =I_i^{\mathrm{left}}        \\
       p^{\mathrm{right}}  & =1- g(R_\infty)                                                                                  \\
-                          & \in [1-\sup_{R\in\mathcal{R}_i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R)]   \\&=I_i^{\mathrm{right}} \\
+                          & \in \left[ 1-\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R) \right] =I_i^{\mathrm{right}} \\
       p^{\mathrm{double}} & = 2\min\{g(R_\infty), 1-g(R_\infty)\}                                                          \\
-                          & \in [2\min\{\inf_{R\in\mathcal{R}_ i}g(R), 1-\sup_{R\in\mathcal{R}_ i}g(R)\},
-            2\min\{\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R)\}]\\&=I_i^{\mathrm{double}}
+                          & \in \left[ 2\min\lbrace\inf_{R\in\mathcal{R}_ i}g(R), 1-\sup_{R\in\mathcal{R}_ i}g(R)\rbrace,
+            2\min\lbrace\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R)\rbrace \right] =I_i^{\mathrm{double}}
 \end{align*}
 $$
 
