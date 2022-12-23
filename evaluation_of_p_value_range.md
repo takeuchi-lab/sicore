@@ -9,7 +9,7 @@ $$
     \mathcal{R} = \lbrace R\subset \mathbb{R}\mid t\in R, \text{$R$ is a union set of closed intervals.}\rbrace
 $$
 - $g$ を $g\colon \mathcal{R}\ni R\mapsto g(R)\in[0,1]$ なる写像として, $g(R)$ は
-- 分布 $F$ の $R$ による切断分布の累積分布関数 $F^R$ の引数として$t$を与えたときの値 $F^R(t)$ とする.
+- 分布 $F$ の $R$ による切断分布の累積分布関数 $F^R$ の引数として $t$ を与えたときの値 $F^R(t)$ とする.
 - $p$ を $p\colon \mathcal{R}\ni R\mapsto p(R)\in[0,1]$ なる写像として, $p(R)$ は対象とする
   検定方式に応じて次のように定めるとする.
 
@@ -45,7 +45,7 @@ $$
 - 探索によって, 実数値に対してそれを含むような幅を持つ閉区間
   が得られることから, 高々可算回の探索で全実数域の探索が
   完了するため, 集合族 $\lbrace S_i\rbrace_{i\in\mathbb{N}}$, $\lbrace U_i\rbrace_{i\in\mathbb{N}}$
-  が $S_\infty =\mathbb{R}$, $U_\infty =\emptyset$ となるように構成できる.
+  が $S_\infty =\mathbb{R}$, $U_\infty =\emptyset$ となるように構成できる. また集合族 $\lbrace S_i\rbrace_{i\in\mathbb{N}}$ は $\mathcal{R}$ の部分集合である.
 - 集合族 $\lbrace R_i\rbrace_{i\in\mathbb{N}}$ は $\mathcal{R}$ の部分集合であり, $S_\infty=\mathbb{R}$
   から明らかに $R_\infty$ が真の切断領域となる.
 - 真の $p$ 値は明らかに $p(R_\infty)$ となる.
@@ -75,13 +75,13 @@ $$
 
 ## 目的の閉区間の列の構成
 
-先の議論から任意の$i$に対して $R_\infty\in\mathcal{R}_i$ であるため
+先の議論から任意の $i$ に対して $R_\infty\in\mathcal{R}_i$ であるため
 
 $$
     \inf_{R\in\mathcal{R}_i}g(R)\leq g(R_\infty) \leq \sup_{R\in\mathcal{R}_i}g(R) \tag{3}
 $$
 
-が成立する. ここで両辺はそれぞれ, 写像 $g$ と集合族 $\mathcal{R}_i$ の定義と $s_i\leq t\leq e_i$ であることから
+が成立する. ここで両辺はそれぞれ, 写像 $g$ と集合族 $\mathcal{R}_ i$ の定義と $s_i\leq t\leq e_i$ であることから
 累積分布関数の定義に注意すれば次のようにして計算することができる.
 
 $$
