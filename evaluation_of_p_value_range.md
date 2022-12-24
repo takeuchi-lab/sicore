@@ -8,8 +8,7 @@
 $$
     \mathcal{R} = \lbrace R\subset \mathbb{R}\mid t\in R,\  \text{$R$ is a union set of closed intervals.}\rbrace
 $$
-- $g$ を $g\colon \mathcal{R}\ni R\mapsto g(R)\in[0,1]$ なる写像として, $g(R)$ は
-- 分布 $F$ の $R$ による切断分布の累積分布関数 $F^R$ の引数として $t$ を与えたときの値 $F^R(t)$ とする.
+- $g$ を $g\colon \mathcal{R}\ni R\mapsto g(R)\in[0,1]$ なる写像として, $g(R)$ は分布 $F$ の $R$ による切断分布の累積分布関数 $F^R$ の引数として $t$ を与えたときの値 $F^R(t)$ とする.
 - $p$ を $p\colon \mathcal{R}\ni R\mapsto p(R)\in[0,1]$ なる写像として, $p(R)$ は対象とする検定方式に応じて次のように定めるとする.
 
 $$
@@ -102,7 +101,39 @@ $$
 
 まず $R_i\cup [e_i, \infty]$ については次のような式変形から示される.
 
+$$
+    \begin{align*}
+    (R_i \cup [e_i, \infty]) \cap [-\infty, t] = R_i\cap [-\infty, t] \subset R\cap [-\infty, t]
+    \end{align*}
+$$
+
+$$
+    \begin{align*}
+    R \cap [t, \infty] &= (R_i\cup R\setminus R_i) \cap [t, \infty] \\
+                       &= (R_i\cap [t, \infty]) \cup (R\setminus R_i \cap [t, \infty]) \\
+                       &\subset (R_i\cap [t, \infty]) \cup (\mathbb{R}\setminus (s_i, e_i) \cap [t,\infty]) \\
+                       &= (R_i\cap [t, \infty]) \cup ([e_i, \infty] \cap [t, \infty]) \\
+                       &= (R_i\cup [e_i, \infty]) \cap [t, \infty]
+    \end{align*}
+$$
+
 続いて $R_i\cup [-\infty, s_i]$ についても次のような式変形から示される.
+
+$$
+    \begin{align*}
+    (R_i \cup [-\infty, s_i]) \cap [t, \infty] = R_i\cap [t, \infty] \subset R\cap [t, \infty]
+    \end{align*}
+$$
+
+$$
+    \begin{align*}
+    R \cap [-\infty, t] &= (R_i\cup R\setminus R_i) \cap [-\infty, t] \\
+                       &= (R_i\cap [-\infty, t]) \cup (R\setminus R_i \cap [-\infty, t]) \\
+                       &\subset (R_i\cap [-\infty, t]) \cup (\mathbb{R}\setminus (s_i, e_i) \cap [-\infty, t]) \\
+                       &= (R_i\cap [-\infty, t]) \cup ([-\infty, s_i] \cap [-\infty, t]) \\
+                       &= (R_i\cup [-\infty, s_i]) \cap [-\infty, t]
+    \end{align*}
+$$
 
 以上の結果から最終的には次のようにして式(3)の両辺を明示的に書き下すことができる.
 
@@ -121,12 +152,15 @@ $$
 $$
 \begin{align*}
     p^{\mathrm{left}} & = g(R_\infty)                                                                                    \\
-                          & \in \left[ \inf_{R\in\mathcal{R}_ i}g(R), \sup_{R\in\mathcal{R}_ i}g(R) \right] =I_i^{\mathrm{left}}        \\
+                          & \in \left[ \inf_{R\in\mathcal{R}_ i}g(R), \sup_{R\in\mathcal{R}_ i}g(R) \right] \\
+                          & =I_i^{\mathrm{left}}        \\
       p^{\mathrm{right}}  & =1- g(R_\infty)                                                                                  \\
-                          & \in \left[ 1-\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R) \right] =I_i^{\mathrm{right}} \\
+                          & \in \left[ 1-\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R) \right]   \\ 
+                          & =I_i^{\mathrm{right}} \\
       p^{\mathrm{double}} & = 2\min\{g(R_\infty), 1-g(R_\infty)\}                                                          \\
                           & \in \left[ 2\min\lbrace\inf_{R\in\mathcal{R}_ i}g(R), 1-\sup_{R\in\mathcal{R}_ i}g(R)\rbrace,
-            2\min\lbrace\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R)\rbrace \right] =I_i^{\mathrm{double}}
+                            2\min\lbrace\sup_{R\in\mathcal{R}_ i}g(R), 1-\inf_{R\in\mathcal{R}_ i}g(R)\rbrace \right] \\
+                          & =I_i^{\mathrm{double}}
 \end{align*}
 $$
 
