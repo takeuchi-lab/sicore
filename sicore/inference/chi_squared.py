@@ -315,10 +315,7 @@ class SelectiveInferenceChiSquared(InferenceChiSquared):
                 when `dps` is set to 'auto'. Defaults to 5000.
 
         Returns:
-            (boolean, float, float): (
-                whether null hypothesis is reject or not,
-                lower bound of p-value obtained in the final,
-                upper bound of p-value obtained in the final,)
+            (boolean, float, float): (reject or not, lower of p-value, upper of p-value)
         """
         self.tol = tol
         self.step = step
