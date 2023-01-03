@@ -5,6 +5,38 @@ from scipy.stats import norm, ttest_ind, ttest_1samp
 
 from ..utils import is_int_or_float
 
+from typing import List, Any, Dict
+from dataclasses import dataclass
+
+
+@dataclass
+class SelectiveInferenceResult():
+    """
+    This class contains the results of selective inference.
+
+    Attributes:
+        stat (float): Observed value of test statistic
+        p_value (float | None): p-value from test performed.
+        inf_p (float): Lower bound of p-value.
+        sup_p (float): Upper bound of p-value.
+        reject_or_not (bool): Whether or not to reject the null hypothesis.
+        truncated_intervals (List[List[float]]): Intervals from which the selected model is obtained.
+        search_count (int): Number of times the truncated intervals were searched.
+        detect_count (int): Number of times that the same model as the observed model was obtained.
+        selected_model (Any | None): The model selected for the observed test statistic.
+        mappings (Dict[tuple[float], Any] | None): A dictionary that holds the model obtained at any point.
+    """
+    stat: float
+    p_value: float | None
+    inf_p: float
+    sup_p: float
+    reject_or_not: bool
+    truncated_intervals: List[List[float]]
+    search_count: int
+    detect_count: int
+    selected_model: Any | None
+    mappings: Dict[tuple[float], Any] | None
+
 
 INF = float('inf')
 NINF = -INF

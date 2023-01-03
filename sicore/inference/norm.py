@@ -6,6 +6,9 @@ from ..intervals import intersection, not_, poly_lt_zero, union_all, _interval_t
 from ..cdf_mpmath import tn_cdf_mpmath as tn_cdf
 from .base import *
 
+from scipy.stats import norm
+from typing import Callable, List, Dict, Tuple, Type
+
 
 class InferenceNorm(ABC):
     """
@@ -312,7 +315,7 @@ class SelectiveInferenceNorm(InferenceNorm):
                 when `dps` is set to 'auto'. Defaults to 5000.
 
         Returns:
-            (boolean, float, float): (reject or not, lower of p-value, upper of p-value)
+            (bool, float, float): (reject or not, lower of p-value, upper of p-value)
         """
         self.tol = tol
         self.step = step
@@ -377,6 +380,270 @@ class SelectiveInferenceNorm(InferenceNorm):
                 z = z_l
             else:
                 z = z_r
+
+    def calc_range_of_cdf_value(self, stat, truncated_intervals, searched_intervals):
+
+        unsearched_intervals = not_(searched_intervals)
+        s = intersection(unsearched_intervals, [
+            NINF, float(stat)])[-1][-1]
+        e = intersection(unsearched_intervals, [
+            float(stat), INF])[0][0]
+
+        sup_intervals = union_all(
+            truncated_intervals + [[NINF, s]], tol=self.tol)
+        inf_intervals = union_all(
+            truncated_intervals + [[e, INF]], tol=self.tol)
+
+        norm_sup_intervals = standardize(
+            sup_intervals, 0, self.eta_sigma_eta)
+        norm_inf_intervals = standardize(
+            inf_intervals, 0, self.eta_sigma_eta)
+
+        sup_F = tn_cdf(stat, norm_sup_intervals,
+                       dps=self.dps, max_dps=self.max_dps, out_log=self.out_log)
+        inf_F = tn_cdf(stat, norm_inf_intervals,
+                       dps=self.dps, max_dps=self.max_dps, out_log=self.out_log)
+        return inf_F, sup_F
+
+    def inference(
+        self, algorithm: Callable[[np.ndarray, np.ndarray, float], Tuple[List[List[float]], Any]],
+        model_selector: Callable[[Any], bool], significance_level: float = 0.05,
+        tail: str = 'double', tol: float = 1e-10, step: float = 1e-10,
+        check_only_reject_or_not: bool = False, over_conditioning: bool = False,
+        line_search: bool = True, max_tail: float = 1e3,
+        retain_selected_model: bool = False, retain_mappings: bool = False,
+        dps: int | str = 'auto', max_dps: int = 5000, out_log: str = 'test_log.log'
+    ) -> Type[SelectiveInferenceResult]:
+
+        if over_conditioning and check_only_reject_or_not:
+            raise Exception(
+                'The two options, check_only_reject_or_not and over-conditioning, cannot be activated at the same time.'
+            )
+
+        if over_conditioning:
+            result = self._over_conditioned_inference(
+                algorithm, significance_level, tail, retain_selected_model,
+                tol, dps, max_dps, out_log)
+            return result
+
+        if check_only_reject_or_not:
+            result = self._rejectability_only_inference(
+                algorithm, model_selector, significance_level, tail,
+                retain_selected_model, retain_mappings, tol, step,
+                dps, max_dps, out_log)
+        else:
+            result = self._parametric_inference(
+                algorithm, model_selector, significance_level, tail, line_search, max_tail,
+                retain_selected_model, retain_mappings, tol, step, dps, max_dps, out_log)
+
+        return result
+
+    def _parametric_inference(
+        self, algorithm, model_selector, significance_level=0.05, tail='double',
+        line_search=True, max_tail=1000, retain_selected_model=False, retain_mappings=False,
+        tol=1e-10, step=1e-10, dps='auto', max_dps=5000, out_log='test_log.log'
+    ):
+
+        self.tol = tol
+        self.dps = dps
+        self.max_dps = max_dps
+        self.out_log = out_log
+
+        self.searched_intervals = union_all(
+            [[NINF, -float(max_tail)], [float(max_tail), INF]], tol=self.tol
+        )
+        self.step = step
+        mappings = dict() if retain_mappings else None
+        result_intervals = list()
+
+        search_count = 0
+        detect_count = 0
+
+        stat = standardize(self.stat, 0, self.eta_sigma_eta)
+        z = self._next_search_data(line_search)
+
+        while True:
+
+            if z is None:
+                break
+
+            search_count += 1
+            if search_count > 1e6:
+                raise Exception(
+                    'The number of searches exceeds 100,000 times, suggesting an infinite loop.')
+
+            model, interval = algorithm(self.z, self.c, z)
+            interval = np.asarray(interval)
+            intervals = _interval_to_intervals(interval)
+
+            if retain_mappings:
+                for interval in intervals:
+                    interval = tuple(interval)
+                    if interval in mappings:
+                        raise Exception(
+                            "An interval appeared a second time. Usually, numerical error "
+                            "causes this exception. Consider increasing the tol parameter "
+                            "or decreasing max_tail parameter to avoid it."
+                        )
+                    mappings[interval] = model
+
+            if model_selector(model):
+                selected_model = model if retain_selected_model else None
+                result_intervals += intervals
+                detect_count += 1
+
+            self.searched_intervals = union_all(
+                self.searched_intervals + intervals, tol=tol)
+
+            z = self._next_search_data(line_search)
+
+        truncated_intervals = union_all(result_intervals, tol=self.tol)
+
+        p_value = self.test(truncated_intervals, dps=dps,
+                            max_dps=max_dps, out_log=out_log)
+
+        inf_F, sup_F = self.calc_range_of_cdf_value(
+            stat, truncated_intervals, [[-float(max_tail), float(max_tail)]])
+        inf_p, sup_p = calc_p_range(inf_F, sup_F, tail=tail)
+
+        return SelectiveInferenceResult(
+            stat, p_value, inf_p, sup_p, (p_value <= significance_level),
+            standardize(truncated_intervals, 0, self.eta_sigma_eta),
+            search_count, detect_count, selected_model, mappings)
+
+    def _rejectability_only_inference(
+        self, algorithm, model_selector, significance_level=0.05, tail='double',
+        retain_selected_model=False, retain_mappings=False, tol=1e-10, step=1e-10,
+        dps='auto', max_dps=5000, out_log='test_log.log'
+    ):
+        self.tol = tol
+        self.step = step
+        self.searched_intervals = list()
+        truncated_intervals = list()
+        mappings = dict() if retain_mappings else None
+
+        search_count = 0
+        detect_count = 0
+
+        stat = standardize(self.stat, 0, self.eta_sigma_eta)
+
+        z = self.stat
+        while True:
+            if search_count > 1e6:
+                raise Exception(
+                    'The number of searches exceeds 100,000 times, suggesting an infinite loop.')
+            search_count += 1
+
+            model, interval = algorithm(self.z, self.c, z)
+            interval = np.asarray(interval)
+            intervals = _interval_to_intervals(interval)
+
+            if retain_mappings:
+                for interval in intervals:
+                    interval = tuple(interval)
+                    if interval in mappings:
+                        raise Exception(
+                            "An interval appeared a second time. Usually, numerical error "
+                            "causes this exception. Consider increasing the tol parameter "
+                            "or decreasing max_tail parameter to avoid it."
+                        )
+                    mappings[interval] = model
+
+            if model_selector(model):
+                selected_model = model if retain_selected_model else None
+                truncated_intervals += intervals
+                detect_count += 1
+
+            self.searched_intervals = union_all(
+                self.searched_intervals + intervals, tol=self.tol)
+
+            unsearched_intervals = not_(self.searched_intervals)
+            s = intersection(unsearched_intervals, [
+                             NINF, float(self.stat)])[-1][1]
+            e = intersection(unsearched_intervals, [
+                             float(self.stat), INF])[0][0]
+
+            sup_intervals = union_all(
+                truncated_intervals + [[NINF, s]], tol=self.tol)
+            inf_intervals = union_all(
+                truncated_intervals + [[e, INF]], tol=self.tol)
+
+            norm_sup_intervals = standardize(
+                sup_intervals, 0, self.eta_sigma_eta)
+            norm_inf_intervals = standardize(
+                inf_intervals, 0, self.eta_sigma_eta)
+
+            sup_F = tn_cdf(stat, norm_sup_intervals,
+                           dps=dps, max_dps=max_dps, out_log=out_log)
+            inf_F = tn_cdf(stat, norm_inf_intervals,
+                           dps=dps, max_dps=max_dps, out_log=out_log)
+
+            inf_p, sup_p = calc_p_range(inf_F, sup_F, tail=tail)
+
+            if sup_p <= significance_level:
+                reject_or_not = True
+                break
+            if inf_p > significance_level:
+                reject_or_not = False
+                break
+
+            z_l = s - self.step
+            z_r = e + self.step
+
+            if norm.pdf(z_l, 0, np.sqrt(self.eta_sigma_eta)) < norm.pdf(z_r, 0, np.sqrt(self.eta_sigma_eta)):
+                z = z_r
+            else:
+                z = z_l
+
+        return SelectiveInferenceResult(
+            stat, None, inf_p, sup_p, reject_or_not,
+            standardize(union_all(truncated_intervals), 0, self.eta_sigma_eta),
+            search_count, detect_count, selected_model, mappings)
+
+    def _over_conditioned_inference(
+        self, algorithm, significance_level=0.05, tail='double', retain_selected_model=False,
+        tol=1e-10, dps='auto', max_dps=5000, out_log='test_log.log'
+    ):
+
+        self.tol = tol
+        self.dps = dps
+        self.max_dps = max_dps
+        self.out_log = out_log
+
+        stat = standardize(self.stat, 0, self.eta_sigma_eta)
+
+        model, interval = algorithm(self.z, self.c, self.stat)
+        interval = np.asarray(interval)
+        intervals = _interval_to_intervals(interval)
+
+        p_value = self.test(intervals)
+
+        unsearched_intervals = not_(intervals)
+        s = intersection(unsearched_intervals, [
+            NINF, float(self.stat)])[-1][1]
+        e = intersection(unsearched_intervals, [
+            float(self.stat), INF])[0][0]
+
+        sup_intervals = union_all(
+            intervals + [[NINF, s]], tol=self.tol)
+        inf_intervals = union_all(
+            intervals + [[e, INF]], tol=self.tol)
+
+        norm_sup_intervals = standardize(
+            sup_intervals, 0, self.eta_sigma_eta)
+        norm_inf_intervals = standardize(
+            inf_intervals, 0, self.eta_sigma_eta)
+
+        sup_F = tn_cdf(stat, norm_sup_intervals,
+                       dps=dps, max_dps=max_dps, out_log=out_log)
+        inf_F = tn_cdf(stat, norm_inf_intervals,
+                       dps=dps, max_dps=max_dps, out_log=out_log)
+        inf_p, sup_p = calc_p_range(inf_F, sup_F, tail=tail)
+
+        return SelectiveInferenceResult(
+            stat, p_value, inf_p, sup_p, (p_value <= significance_level),
+            standardize(intervals, 0, self.eta_sigma_eta), 1, 1,
+            None, model if retain_selected_model else None)
 
 
 class SelectiveInferenceNormSE(SelectiveInferenceNorm):
