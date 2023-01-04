@@ -15,7 +15,8 @@ class SelectiveInferenceResult():
     This class contains the results of selective inference.
 
     Attributes:
-        stat (float): Observed value of test statistic
+        stat (float): Observed value of test statistic.
+        alpha (float): Significance level.
         p_value (float | None): p-value from test performed.
         inf_p (float): Lower bound of p-value.
         sup_p (float): Upper bound of p-value.
@@ -27,6 +28,7 @@ class SelectiveInferenceResult():
         mappings (Dict[tuple[float], Any] | None): A dictionary that holds the model obtained at any point.
     """
     stat: float
+    alpha: float
     p_value: float | None
     inf_p: float
     sup_p: float
