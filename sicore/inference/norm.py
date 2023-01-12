@@ -410,16 +410,28 @@ class SelectiveInferenceNorm(InferenceNorm):
             def method(z): return -np.abs(z - float(self.stat))
         if choose_method == 'high_pdf':
             def method(z): return norm.pdf(z, 0, np.sqrt(self.eta_sigma_eta))
+        if choose_method == 'random':
+            return random.choice(args)
         return max(args, key=method)
 
     def inference(
-        self, algorithm: Callable[[np.ndarray, np.ndarray, float], Tuple[List[List[float]], Any]],
-        model_selector: Callable[[Any], bool], significance_level: float = 0.05,
-        tail: str = 'double', tol: float = 1e-10, step: float = 1e-10,
-        check_only_reject_or_not: bool = False, over_conditioning: bool = False,
-        line_search: bool = True, max_tail: float = 1e3, choose_method: str = 'near_stat',
-        retain_selected_model: bool = False, retain_mappings: bool = False,
-        dps: int | str = 'auto', max_dps: int = 5000, out_log: str = 'test_log.log'
+        self,
+        algorithm: Callable[[np.ndarray, np.ndarray, float], Tuple[List[List[float]], Any]],
+        model_selector: Callable[[Any], bool],
+        significance_level: float = 0.05,
+        tail: str = 'double',
+        tol: float = 1e-10,
+        step: float = 1e-10,
+        check_only_reject_or_not: bool = False,
+        over_conditioning: bool = False,
+        line_search: bool = True,
+        max_tail: float = 1e3,
+        choose_method: str = 'near_stat',
+        retain_selected_model: bool = False,
+        retain_mappings: bool = False,
+        dps: int | str = 'auto',
+        max_dps: int = 5000,
+        out_log: str = 'test_log.log'
     ) -> Type[SelectiveInferenceResult]:
 
         if over_conditioning and check_only_reject_or_not:
